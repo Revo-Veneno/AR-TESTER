@@ -2,74 +2,84 @@
 //  ViewController.swift
 //  AR TESTER
 //
-//  Created by Andrew Wang on 2019/03/09.
+//  Created by Andrew Wang on 2019/03/11.
 //  Copyright © 2019 Andrew Wang. All rights reserved.
 //
 
-import UIKit
-import SceneKit
+import Foundation
 import ARKit
 
-class ViewController: UIViewController, ARSCNViewDelegate {
-
-    @IBOutlet var sceneView: ARSCNView!
+class GameViewController: UIViewController, ARSCNViewDelegate {
+    
+    let arView: ARSCNView = {
+        let view = ARSCNView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    let configuration = ARWorldTrackingConfiguration()
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Do any additional setup after loading the view, typically from a nib.
         
-        // Set the view's delegate
-        sceneView.delegate = self
+        view.addSubview(arView)
         
-        // Show statistics such as fps and timing information
-        sceneView.showsStatistics = true
+        arView.topAnchor.constraint(equalTo: view.topAnchor).isActive = true
+        arView.rightAnchor.constraint(equalTo: view.rightAnchor).isActive = true
+        arView.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
+        arView.leftAnchor.constraint(equalTo: view.leftAnchor).isActive = true
         
-        // Create a new scene
-        let scene = SCNScene(named: "art.scnassets/ship.scn")!
+        configuration.planeDetection = .horizontal
+        arView.session.run(configuration, options: [])
+        arView.debugOptions = [ARSCNDebugOptions.showFeaturePoints]
         
-        // Set the scene to the view
-        sceneView.scene = scene
+        arView.delegate = self
     }
     
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        
-        // Create a session configuration
-        let configuration = ARWorldTrackingConfiguration()
-
-        // Run the view's session
-        sceneView.session.run(configuration)
-    }
-    
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        
-        // Pause the view's session
-        sceneView.session.pause()
-    }
-
-    // MARK: - ARSCNViewDelegate
-    
-/*
-    // Override to create and configure nodes for anchors added to the view's session.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
+    func create(anchor: ARPlaneAnchor) -> SCNNode {
         let node = SCNNode()
-     
+        node.name = "floor"
+        node.eulerAngles = SCNVector3(90.degreesToRadians, 0, 0)
+        node.geometry = SCNPlane(width: CGFloat(anchor.extent.x), height: CGFloat(anchor.extent.z))
+        node.geometry?.firstMaterial?.diffuse.contents = #imageLiteral(resourceName: "Floor")
+        node.geometry?.firstMaterial?.isDoubleSided = true
+        node.position = SCNVector3(anchor.center.x, anchor.center.y, anchor.center.z)
         return node
     }
-*/
     
-    func session(_ session: ARSession, didFailWithError error: Error) {
-        // Present an error message to the user
-        
+    func removeNode(named: String) {
+        arView.scene.rootNode.enumerateChildNodes { (node, _) in
+            if node.name == named {
+                node.removeFromParentNode()
+            }
+        }
     }
     
-    func sessionWasInterrupted(_ session: ARSession) {
-        // Inform the user that the session has been interrupted, for example, by presenting an overlay
-        
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        // Dispose of any resources that can be recreated.
     }
     
-    func sessionInterruptionEnded(_ session: ARSession) {
-        // Reset tracking and/or remove existing anchors if consistent tracking is required
-        
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+        guard let anchorPlane = anchor as? ARPlaneAnchor else { return }
+        print("New plane anchor found with extent:", anchorPlane.extent)
+        let planeNode = create(anchor: anchorPlane)
+        node.addChildNode(planeNode)
     }
+    
+    func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
+        guard let anchorPlane = anchor as? ARPlaneAnchor else { return }
+        print("Plane anchor updated with extent:", anchorPlane.extent)
+        removeNode(named: "floor")
+        let planeNode = create(anchor: anchorPlane)
+        node.addChildNode(planeNode)
+    }
+    
+    func renderer(_ renderer: SCNSceneRenderer, didRemove node: SCNNode, for anchor: ARAnchor) {
+        guard let anchorPlane = anchor as? ARPlaneAnchor else { return }
+        print("Plane anchor removed with extent:", anchorPlane.extent)
+        removeNode(named: "floor")
+    }
+    
 }
